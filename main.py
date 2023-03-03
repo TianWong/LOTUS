@@ -1,3 +1,4 @@
+import os
 import sys
 import re
 from cmd import Cmd
@@ -783,11 +784,19 @@ class Interpreter(Cmd):
 ### MAIN PROGRAM
 ###
 
-
-try:
-  Interpreter().cmdloop()
-except KeyboardInterrupt:
-  print("\nKeyboard Interrupt (Ctrl+C)")
-  pass
-# except:
-#   pass
+if __name__ == '__main__':
+  execution_lines = []
+  if len(sys.argv) > 1:
+    target_file = sys.argv[1]
+    if os.path.isfile(target_file):
+      with open(target_file, 'r') as infile:
+        execution_lines = infile.read().split('\n')
+  try:
+    interpreter = Interpreter()
+    interpreter.cmdqueue.extend(execution_lines)
+    interpreter.cmdloop()
+  except KeyboardInterrupt:
+    print("\nKeyboard Interrupt (Ctrl+C)")
+    pass
+  # except:
+  #   pass
