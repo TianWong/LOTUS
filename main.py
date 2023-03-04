@@ -779,6 +779,22 @@ class Interpreter(Cmd):
 
       hop_number -= 1
       customer_as_list = list(set(next_customer_as_list))
+  
+  def execute(self, scenario):
+    """
+    executes a given scenario, returning once completed
+    in contrast to cmdloop, which maintains an interactive environment
+    """
+    if os.path.isfile(scenario):
+      with open(scenario, 'r') as in_file:
+          execution_lines = in_file.read().split('\n')
+
+    self.cmdqueue.extend(execution_lines)
+    while self.cmdqueue:
+      line = self.cmdqueue.pop(0)
+      line = self.precmd(line)
+      stop = self.onecmd(line)
+      stop = self.postcmd(stop, line)
 
 ###
 ### MAIN PROGRAM
