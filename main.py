@@ -785,16 +785,78 @@ class Interpreter(Cmd):
     executes a given scenario, returning once completed
     in contrast to cmdloop, which maintains an interactive environment
     """
+    counter = 0
     if os.path.isfile(scenario):
       with open(scenario, 'r') as in_file:
           execution_lines = in_file.read().split('\n')
 
     self.cmdqueue.extend(execution_lines)
     while self.cmdqueue:
+      counter += 1
       line = self.cmdqueue.pop(0)
-      line = self.precmd(line)
-      stop = self.onecmd(line)
-      stop = self.postcmd(stop, line)
+      # line = self.precmd(line)
+      # stop = self.onecmd(line)
+      # stop = self.postcmd(stop, line)
+      self.onecmd(line)
+      if counter % 10000 == 0:
+        print(counter)
+
+  def do_exportIter(self, line):
+    """
+    export the file iteratively
+    intended for large export which would otherwise exhaust system resources
+    """
+    MAX_ITEMS = 1000
+    try:
+      if line == "":
+        raise LOTUSInputError
+    except LOTUSInputError:
+      print("Usage: export [filename]", file=sys.stderr)
+      return
+
+    # export_content = {}
+    with open(line, mode="w") as f:
+      export_content = {}
+
+      export_content["AS_list"] = []
+      class_list = self.as_class_list.get_AS_list()
+      for v in class_list.values():
+        export_content["AS_list"].append({"AS": v.as_number, "network_address": v.network_address, "policy": v.policy, "routing_table": v.routing_table.get_table()})
+
+      export_content["IP_gen_seed"] = self.as_class_list.ip_gen.index
+
+      export_content["message"] = []
+      tmp_queue = queue.Queue()
+      while not self.message_queue.empty():
+        q = self.message_queue.get()
+        export_content["message"].append(q)
+        tmp_queue.put(q)
+      self.message_queue = tmp_queue
+
+      export_content["connection"] = self.connection_list
+
+      export_content["ASPA"] = self.public_aspa_list
+
+      yaml.dump(export_content, f)
+      # use exportIter to export file, supplying a custom yield_len for the AS_list dict entries
+  
+  def yield_len(iterator, max_segment_len):
+      for _ in range(max_segment_len):
+        yield iterator.next()
+
+  def __exportIter__(seq, max_segment_len, key, f, yield_entry=yield_len):
+    iterator = iter(seq)
+    first = True
+    while True:
+      res = list(yield_entry(iterator, max_segment_len))
+      if not res:
+        return
+      if first:
+        yaml.dump({key:res}, f)
+        first = False
+      else:
+        yaml.dump(res, f)
+      
 
 ###
 ### MAIN PROGRAM
