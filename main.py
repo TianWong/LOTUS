@@ -5,6 +5,7 @@ from cmd import Cmd
 import queue
 import yaml
 import ipaddress
+import itertools
 
 class AS_class_list:
   def __init__(self):
@@ -801,6 +802,18 @@ class Interpreter(Cmd):
       if counter % 10000 == 0:
         print(counter)
 
+  def exportIter(self, iterable, max_items, key, line, func=None):
+    first = True
+    for i in range(0, len(iterable), max_items):
+      it = list(itertools.islice(iterable, i, i+max_items))
+      if func:
+        it = list(map(func, it))
+      with open(line, mode="a") as f:
+        if first:
+          yaml.dump({key:list(it)}, f)
+        else:
+          yaml.dump(list(it), f)
+
   def do_exportIter(self, line):
     """
     export the file iteratively
@@ -814,48 +827,33 @@ class Interpreter(Cmd):
       print("Usage: export [filename]", file=sys.stderr)
       return
 
-    # export_content = {}
-    with open(line, mode="w") as f:
-      export_content = {}
+    f = open(line, mode="w")
+    f.close()
 
-      export_content["AS_list"] = []
-      class_list = self.as_class_list.get_AS_list()
-      for v in class_list.values():
-        export_content["AS_list"].append({"AS": v.as_number, "network_address": v.network_address, "policy": v.policy, "routing_table": v.routing_table.get_table()})
+    def create_as_entry(v):
+      return {"AS": v.as_number, "network_address": v.network_address, "policy": v.policy, "routing_table": v.routing_table.get_table()}
+    
+    self.exportIter(self.as_class_list.class_list.values(), MAX_ITEMS, "AS_list", line, func=create_as_entry)
+    print("AS_list done")
+    sys.stdout.flush()
 
-      export_content["IP_gen_seed"] = self.as_class_list.ip_gen.index
+    export_content = {}
+    export_content["IP_gen_seed"] = self.as_class_list.ip_gen.index
 
-      export_content["message"] = []
-      tmp_queue = queue.Queue()
-      while not self.message_queue.empty():
-        q = self.message_queue.get()
-        export_content["message"].append(q)
-        tmp_queue.put(q)
-      self.message_queue = tmp_queue
+    export_content["message"] = []
+    tmp_queue = queue.Queue()
+    while not self.message_queue.empty():
+      q = self.message_queue.get()
+      export_content["message"].append(q)
+      tmp_queue.put(q)
+    self.message_queue = tmp_queue
 
-      export_content["connection"] = self.connection_list
-
-      export_content["ASPA"] = self.public_aspa_list
-
+    with open(line, mode="a") as f:
       yaml.dump(export_content, f)
-      # use exportIter to export file, supplying a custom yield_len for the AS_list dict entries
-  
-  def yield_len(iterator, max_segment_len):
-      for _ in range(max_segment_len):
-        yield iterator.next()
 
-  def __exportIter__(seq, max_segment_len, key, f, yield_entry=yield_len):
-    iterator = iter(seq)
-    first = True
-    while True:
-      res = list(yield_entry(iterator, max_segment_len))
-      if not res:
-        return
-      if first:
-        yaml.dump({key:res}, f)
-        first = False
-      else:
-        yaml.dump(res, f)
+    self.exportIter(self.connection_list, MAX_ITEMS, "connection", line)
+
+    self.exportIter(self.public_aspa_list, MAX_ITEMS, "ASPA", line)
       
 
 ###
