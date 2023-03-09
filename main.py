@@ -3,9 +3,11 @@ import sys
 import re
 from cmd import Cmd
 import queue
+from typing import Tuple
 import yaml
 import ipaddress
 import itertools
+import gc
 
 class AS_class_list:
   def __init__(self):
@@ -112,8 +114,11 @@ class AS_class:
     if route_diff == None:
       return
     else:
+      prev_best, route_diff = route_diff
       route_diff["path"] = str(self.as_number) + "-" + route_diff["path"]
-      return route_diff
+      if prev_best:
+        prev_best["path"] = str(self.as_number) + "-" + prev_best["path"]
+      return prev_best, route_diff
 
   def change_ASPV(self, message):
     if message["switch"] == "on":
@@ -228,7 +233,12 @@ class Routing_table:
 
       return semi_state
 
-  def update(self, update_message):
+  def update(self, update_message) -> None | Tuple[None | dict, dict]:
+    """
+    attempts an update to the routing table
+    returns a (prev_best_route, new_best_route) tuple on best route change, or None
+    prev_best_route can be none if not replacing an existing best route
+    """
     network = update_message["network"]
     path = update_message["path"]
     come_from = update_message["come_from"]
@@ -263,7 +273,7 @@ class Routing_table:
           if new_route["LocPrf"] > best["LocPrf"]:
             new_route["best_path"] = True
             best["best_path"] = False
-            return {"path": new_route["path"], "come_from": new_route["come_from"], "network": network}
+            return (best, {"path": new_route["path"], "come_from": new_route["come_from"], "locPrf": new_route["LocPrf"], "network": network})
           elif new_route["LocPrf"] == best["LocPrf"]:
             continue
           elif new_route["LocPrf"] < best["LocPrf"]:
@@ -274,7 +284,7 @@ class Routing_table:
           if new_length < best_length:
             new_route["best_path"] = True
             best["best_path"] = False
-            return {"path": new_route["path"], "come_from": new_route["come_from"], "network": network}
+            return (best, {"path": new_route["path"], "come_from": new_route["come_from"], "locPrf": new_route["LocPrf"], "network": network})
           elif new_length == best_length:
             continue
           elif new_length > best_length:
@@ -292,11 +302,11 @@ class Routing_table:
         else:
           new_route["best_path"] = True
           self.table[network] = [new_route]
-          return {"path": path, "come_from": come_from, "network": network}
+          return (None, {"path": path, "come_from": come_from, "locPrf": new_route["LocPrf"], "network": network})
       else:
         new_route["best_path"] = True
         self.table[network] = [new_route]
-        return {"path": path, "come_from": come_from, "network": network}
+        return (None, {"path": path, "come_from": come_from, "locPrf": new_route["LocPrf"], "network": network})
 
     except BestPathNotExist:
       if self.policy[0] == "aspv":
@@ -304,10 +314,10 @@ class Routing_table:
           return None
         else:
           new_route["best_path"] = True
-          return {"path": path, "come_from": come_from, "network": network}
+          return (None, {"path": path, "come_from": come_from, "locPrf": new_route["LocPrf"], "network": network})
       else:
         new_route["best_path"] = True
-        return {"path": path, "come_from": come_from, "network": network}
+        return (None, {"path": path, "come_from": come_from, "locPrf": new_route["LocPrf"], "network": network})
 
   def get_best_path_list(self):
 
@@ -337,6 +347,7 @@ class Interpreter(Cmd):
     self.message_queue = queue.Queue()
     self.connection_list = []
     self.public_aspa_list = {}
+    self.run_updates = []
 
   intro = """
 ===^^^^^^^^^^^=============================================
@@ -490,11 +501,7 @@ class Interpreter(Cmd):
       print("Error: AS " + str(param[0]) + " is NOT registered.", file=sys.stderr)
 
   def get_connection_with(self, as_number):
-    c_list = []
-    for c in self.connection_list:
-      if as_number in [c["src"], c["dst"]]:
-        c_list.append(c)
-    return c_list
+    return (c for c in self.connection_list if as_number in (c["src"], c["dst"]))
 
   def as_a_is_what_on_c(self, as_a, connection_c):
     if connection_c["type"] == "peer":
@@ -506,7 +513,11 @@ class Interpreter(Cmd):
         return "customer"
 
   def do_run(self, line):
-
+    params = line.split()
+    track_flag = False
+    if len(params) > 0:
+      if params[0] == "diff":
+        track_flag = True
     for as_class in self.as_class_list.get_AS_list().values(): # To reference public_aspa_list when ASPV
       as_class.set_public_aspa(self.public_aspa_list)
 
@@ -526,9 +537,12 @@ class Interpreter(Cmd):
         # peer, customer or provider
         m["come_from"] = self.as_a_is_what_on_c(m["src"], connection)
 
-        route_diff = as_class.update(m)
-        if route_diff == None:
+        update_result = as_class.update(m)
+        if update_result == None:
           continue
+        prev_best, route_diff = update_result
+        if track_flag:
+          self.run_updates.append((prev_best, route_diff))
         if route_diff["come_from"] == "customer":
           for c in connection_with_dst:
             new_update_message = {}
@@ -795,12 +809,9 @@ class Interpreter(Cmd):
     while self.cmdqueue:
       counter += 1
       line = self.cmdqueue.pop(0)
-      # line = self.precmd(line)
-      # stop = self.onecmd(line)
-      # stop = self.postcmd(stop, line)
-      self.onecmd(line)
-      if counter % 10000 == 0:
-        print(counter)
+      line = self.precmd(line)
+      stop = self.onecmd(line)
+      stop = self.postcmd(stop, line)
 
   def exportIter(self, iterable, max_items, key, line, func=None):
     first = True
@@ -810,9 +821,9 @@ class Interpreter(Cmd):
         it = list(map(func, it))
       with open(line, mode="a") as f:
         if first:
-          yaml.dump({key:list(it)}, f)
+          yaml.dump({key:it}, f)
         else:
-          yaml.dump(list(it), f)
+          yaml.dump(it, f)
 
   def do_exportIter(self, line):
     """
@@ -834,22 +845,36 @@ class Interpreter(Cmd):
       return {"AS": v.as_number, "network_address": v.network_address, "policy": v.policy, "routing_table": v.routing_table.get_table()}
     
     self.exportIter(self.as_class_list.class_list.values(), MAX_ITEMS, "AS_list", line, func=create_as_entry)
-    print("AS_list done")
-    sys.stdout.flush()
+    gc.collect()
 
     export_content = {}
     export_content["IP_gen_seed"] = self.as_class_list.ip_gen.index
 
     export_content["message"] = []
     tmp_queue = queue.Queue()
+    first = True
+    counter = 0
     while not self.message_queue.empty():
       q = self.message_queue.get()
-      export_content["message"].append(q)
+      if first:
+        export_content["message"].append(q)
+      else:
+        export_content.append(q)
+      counter += 1
+      if counter >= MAX_ITEMS:
+        with open(line, mode="a") as f:
+          yaml.dump(export_content, f)
+        export_content = []
+        first = False
+        counter = 0
       tmp_queue.put(q)
     self.message_queue = tmp_queue
 
-    with open(line, mode="a") as f:
-      yaml.dump(export_content, f)
+    if export_content:
+      with open(line, mode="a") as f:
+        yaml.dump(export_content, f)
+    del export_content
+    gc.collect()
 
     self.exportIter(self.connection_list, MAX_ITEMS, "connection", line)
 
