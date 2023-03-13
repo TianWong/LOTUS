@@ -12,7 +12,3 @@ addConnection peer 12 11
 addConnection down 11 100
 addConnection down 10 25
 addConnection peer 25 11
-addAllASInit
-run
-genAttack 100 1
-run diff

@@ -9,42 +9,6 @@ import ipaddress
 import itertools
 import gc
 
-class AS_class_list:
-  def __init__(self):
-    self.class_list = {}
-    self.ip_gen = IP_address_generator()
-
-  def add_AS(self, as_number):
-    if not as_number in self.class_list.keys():
-      self.class_list[as_number] = AS_class(as_number, self.ip_gen.get_unique_address())
-    else:
-      print("Error: AS " + str(as_number) + " is already registered.", file=sys.stderr)
-
-  def show_AS_list(self, sort_flag, best_flag, address):
-
-    keys = list(self.class_list.keys())
-    if sort_flag == True:
-      keys.sort()
-
-    for k in keys:
-      self.class_list[k].show_info(only_best=best_flag, address=address)
-
-  def get_AS(self, as_number):
-    return self.class_list[as_number]
-
-  def get_AS_list(self):
-    return self.class_list
-
-  def import_AS_list(self, import_list):
-
-    self.class_list = {}
-    for a in import_list:
-      self.class_list[a["AS"]] = AS_class(a["AS"], a["network_address"])
-      self.class_list[a["AS"]].policy = a["policy"]
-      self.class_list[a["AS"]].routing_table.change_policy(a["policy"])
-      self.class_list[a["AS"]].routing_table.table = a["routing_table"]
-
-
 class IP_address_generator:
   def __init__(self):
     self.index = 1 # To generate unique address
@@ -147,6 +111,42 @@ class AS_class:
           else:
             new_update_message_list.append({"src": update_src, "dst": update_dst, "path": update_src + "-" + r["path"], "network": r["network"]})
     return new_update_message_list
+
+class AS_class_list:
+  def __init__(self):
+    self.class_list = {}
+    self.ip_gen = IP_address_generator()
+
+  def add_AS(self, as_number):
+    if not as_number in self.class_list.keys():
+      self.class_list[as_number] = AS_class(as_number, self.ip_gen.get_unique_address())
+    else:
+      print("Error: AS " + str(as_number) + " is already registered.", file=sys.stderr)
+
+  def show_AS_list(self, sort_flag, best_flag, address):
+
+    keys = list(self.class_list.keys())
+    if sort_flag == True:
+      keys.sort()
+
+    for k in keys:
+      self.class_list[k].show_info(only_best=best_flag, address=address)
+
+  def get_AS(self, as_number) -> AS_class:
+    return self.class_list[as_number]
+
+  def get_AS_list(self):
+    return self.class_list
+
+  def import_AS_list(self, import_list):
+
+    self.class_list = {}
+    for a in import_list:
+      self.class_list[a["AS"]] = AS_class(a["AS"], a["network_address"])
+      self.class_list[a["AS"]].policy = a["policy"]
+      self.class_list[a["AS"]].routing_table.change_policy(a["policy"])
+      self.class_list[a["AS"]].routing_table.table = a["routing_table"]
+
 
 class Routing_table:
   def __init__(self, network, policy):
@@ -795,19 +795,12 @@ class Interpreter(Cmd):
       hop_number -= 1
       customer_as_list = list(set(next_customer_as_list))
   
-  def execute(self, scenario):
+  def execute(self, execution_lines):
     """
-    executes a given scenario, returning once completed
-    in contrast to cmdloop, which maintains an interactive environment
+    executes the provided lines of lotus execution commands
     """
-    counter = 0
-    if os.path.isfile(scenario):
-      with open(scenario, 'r') as in_file:
-          execution_lines = in_file.read().split('\n')
-
     self.cmdqueue.extend(execution_lines)
     while self.cmdqueue:
-      counter += 1
       line = self.cmdqueue.pop(0)
       line = self.precmd(line)
       stop = self.onecmd(line)
