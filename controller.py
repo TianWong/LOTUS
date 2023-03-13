@@ -2,7 +2,7 @@ import os
 from lotus_configurator import Lotus_configurator
 from main import Interpreter
 
-BASE_SCENARIO = './world/sample_situation'
+BASE_SCENARIO = './world/ca_gb.lotus'
 
 def run_scenario(base_scenario, config: Lotus_configurator):
     if os.path.isfile(base_scenario):
@@ -33,4 +33,5 @@ def run_scenario(base_scenario, config: Lotus_configurator):
 if __name__ == "__main__":
     config = Lotus_configurator()
     interpreter = run_scenario(BASE_SCENARIO, config)
-    
+    import code
+    code.interact(local=locals())
