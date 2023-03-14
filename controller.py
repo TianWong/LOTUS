@@ -11,16 +11,19 @@ def run_scenario(base_scenario, config: Lotus_configurator):
     interpreter = Interpreter()
     interpreter.execute(execution_lines)
     interpreter.do_addAllASInit("")
+    interpreter.do_run("")
+    
+
+    attack = config.gen_attack()
+    aspa_config = config.gen_aspa(interpreter)
 
     # add ASPA/ASPV configuration
-    aspa_config = config.gen_aspa()
     interpreter.execute(aspa_config)
     interpreter.do_run("")
     
     # add attack from attack_generator
-    attack = config.gen_attack()
     interpreter.execute(attack)
-    interpreter.do_run("diff")    
+    interpreter.do_run("diff")
 
     print(f"aspa_config: {aspa_config}\nattack: {attack}\n")
     updates = interpreter.run_updates
@@ -29,6 +32,7 @@ def run_scenario(base_scenario, config: Lotus_configurator):
         print(f"change {idx}\nold: {old}\nnew: {new}\n")
     # import code
     # code.interact(local=locals())
+    return interpreter
 
 if __name__ == "__main__":
     config = Lotus_configurator()
