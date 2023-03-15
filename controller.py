@@ -1,8 +1,9 @@
 import os
 from lotus_configurator import Lotus_configurator
 from main import Interpreter
+from multiprocessing import Pool
 
-BASE_SCENARIO = './world/ca_gb.lotus'
+BASE_SCENARIO = './world/ranked_ca_gb.lotus'
 
 def run_scenario(base_scenario, config: Lotus_configurator):
     if os.path.isfile(base_scenario):
@@ -14,8 +15,8 @@ def run_scenario(base_scenario, config: Lotus_configurator):
     interpreter.do_run("")
     
 
-    attack = config.gen_attack()
-    aspa_config = config.gen_aspa(interpreter)
+    attack = config.gen_attack(0, ["CA", "GB"])
+    aspa_config = config.gen_aspa()
 
     # add ASPA/ASPV configuration
     interpreter.execute(aspa_config)
@@ -30,12 +31,8 @@ def run_scenario(base_scenario, config: Lotus_configurator):
     for idx, val in enumerate(updates):
         old, new = val
         print(f"change {idx}\nold: {old}\nnew: {new}\n")
-    # import code
-    # code.interact(local=locals())
-    return interpreter
 
 if __name__ == "__main__":
-    config = Lotus_configurator()
-    interpreter = run_scenario(BASE_SCENARIO, config)
-    import code
-    code.interact(local=locals())
+    p = Pool(2)
+    configs = [(BASE_SCENARIO, Lotus_configurator(0,0)), (BASE_SCENARIO, Lotus_configurator(1,0))]
+    p.starmap(run_scenario, configs)
