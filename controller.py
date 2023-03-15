@@ -15,7 +15,7 @@ def run_scenario(base_scenario, config: Lotus_configurator):
     interpreter.do_run("")
     
 
-    attack = config.gen_attack(0, ["CA", "GB"])
+    attack = config.gen_attack()
     aspa_config = config.gen_aspa()
 
     # add ASPA/ASPV configuration

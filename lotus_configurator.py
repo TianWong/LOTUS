@@ -11,7 +11,7 @@ class Lotus_configurator:
         
         self.attack_list = []
 
-    def gen_aspa(self, params) -> list[str]:
+    def gen_aspa(self) -> list[str]:
         setASPV_str = "setASPV {} on {}"
         autoASPA_str = "autoASPA {} {}"
         match self.aspa_situation:
@@ -21,18 +21,16 @@ class Lotus_configurator:
                 return ["autoASPA 39875 3", "setASPV 13768 on 1"]
         # return ["autoASPA 1 1", "setASPV 25 on 3", "setASPV 11 on 3"]
 
-    def _international(self, attack_str:str, params):
-        country_a = params[0]
-        country_b = params[1]
+    def _international(self, attack_str:str):
         return ["genAttack 46320 39875"]
         # return [attack_str.format()]
         pass
 
-    def gen_attack(self, params) -> list[str]:
+    def gen_attack(self) -> list[str]:
         attack_str = "genAttack {} {}"
         match self.attack_type:
             case 0:
-                return self._international(attack_str, params)
+                return self._international(attack_str)
         # return ["genAttack 100 1"]
         pass
 
@@ -40,6 +38,6 @@ if __name__ == "__main__":
     from main import Interpreter
     i = Interpreter()
     config = Lotus_configurator()
-    config.gen_aspa(i)
+    config.gen_aspa()
     import code
     code.interact(local=locals())
