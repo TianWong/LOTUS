@@ -1,47 +1,39 @@
 import random
-from main import Interpreter
+from typing import Tuple
 
 class Lotus_configurator:
-    def __init__(self, aspa, all_asns, seed=None):
+    setASPV_str = "setASPV {} on {}"
+    autoASPA_str = "autoASPA {} {}"
+    attack_str = "genAttack {} {}"
+
+    def __init__(self, aspa_flag:int, all_asns:list[int], seed=None, aspa_rate=0.0):
         if seed:
-            random.seed(seed)
-
+            self.seed = seed
+        else:
+            self.seed = 0
         self.all_asns = all_asns
-        self.aspa_situation = aspa
-        self.attack_type = attack
-        
-        self.attack_list = []
-        self.target = None
+        self.aspa_flag = aspa_flag
+        self.aspa_rate = aspa_rate
 
-    def gen_aspa(self, all_asns) -> list[str]:
-        setASPV_str = "setASPV {} on {}"
-        autoASPA_str = "autoASPA {} {}"
-        match self.aspa_situation:
+    def gen_aspa(self, target) -> list[str]:
+        match self.aspa_flag:
             case 0:
                 return []
             case 1:
-                return ["autoASPA 39875 3", "setASPV 13768 on 1"]
-        # return ["autoASPA 1 1", "setASPV 25 on 3", "setASPV 11 on 3"]
+                num_deploy = int(self.aspa_rate * len(self.all_asns))
+                # protect target with aspa
+                aspa_config = [Lotus_configurator.autoASPA_str.format(target, 2)]
+                aspa_config.extend([Lotus_configurator.setASPV_str.format(x, 1) for x in random.sample(self.all_asns, num_deploy)])
+                print(f"aspv deployed: {num_deploy} at {self.aspa_rate}%")
+                return aspa_config
 
-    def _international(self, attack_str:str):
-        attacker = random.choice(self.all_asns)
-        #self.target = rando
-        return ["genAttack 46320 39875"]
-        # return [attack_str.format()]
-        pass
-
-    def gen_attack(self, all_asns) -> list[str]:
-        attack_str = "genAttack {} {}"
-        match self.attack_type:
-            case 0:
-                return self._international(attack_str)
-        # return ["genAttack 100 1"]
-        pass
-
-if __name__ == "__main__":
-    from main import Interpreter
-    i = Interpreter()
-    config = Lotus_configurator()
-    config.gen_aspa()
-    import code
-    code.interact(local=locals())
+    def gen_attack(self):
+        asns = random.sample(self.all_asns, 3)
+        return (asns, [Lotus_configurator.attack_str.format(asns[0], asns[1])])
+    
+    def gen_situation(self) -> Tuple[list[str], list[str]]:
+        random.seed(self.seed)
+        asns, attack = self.gen_attack()
+        print(f"attack: {attack}")
+        aspa = self.gen_aspa(asns[1])
+        return (aspa, attack)

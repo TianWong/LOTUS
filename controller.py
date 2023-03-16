@@ -15,8 +15,7 @@ def run_scenario(base_scenario, config: Lotus_configurator):
     interpreter.do_addAllASInit("")
     interpreter.do_run("")
 
-    attack = config.gen_attack()
-    aspa_config = config.gen_aspa()
+    aspa_config, attack = config.gen_situation()
 
     # add ASPA/ASPV configuration
     interpreter.execute(aspa_config)
@@ -26,14 +25,14 @@ def run_scenario(base_scenario, config: Lotus_configurator):
     interpreter.execute(attack)
     interpreter.do_run("diff")
 
-    print(f"aspa_config: {aspa_config}\nattack: {attack}\n")
     updates = interpreter.run_updates
-    changes = 0
-    for idx, val in enumerate(updates):
-        old, new = val
-        print(f"change {idx}\nold: {old}\nnew: {new}\n")
-        changes += 1
-    return changes
+    # changes = 0
+    # for idx, val in enumerate(updates):
+    #     old, new = val
+    #     print(f"change {idx}\nold: {old}\nnew: {new}\n")
+    #     changes += 1
+    # return changes
+    return len(updates)
 
 if __name__ == "__main__":
     all_asns = []
@@ -43,15 +42,13 @@ if __name__ == "__main__":
             if line.startswith('addAS '):
                 all_asns.append(int(line[6:]))
     
-    with_aspa_changes = 0
-    without_aspa_changes = 0
-    seed = 0
-    for _ in range(5):
-        p = Pool(2)
-        configs = [(BASE_SCENARIO, Lotus_configurator(0,0,all_asns,seed)), (BASE_SCENARIO, Lotus_configurator(1,0,all_asns,seed))]
-        changes = p.starmap(run_scenario, configs)
-        with_aspa_changes += changes[0]
-        without_aspa_changes += changes[1]
-        seed += 1
-    print(f'Routes changed with ASPA: {with_aspa_changes}')
-    print(f'Routes changed without ASPA: {without_aspa_changes}')
+    p = Pool(6)
+    seed = random.random()
+    configs = []
+    percentages = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+    for i in percentages:
+        configs.append((BASE_SCENARIO, Lotus_configurator(1,all_asns,seed=seed,aspa_rate=i)))
+    
+    changes = p.starmap(run_scenario, configs)
+    for idx, num in enumerate(changes):
+        print(f"{percentages[idx]}% aspa:\t\t{num} changes")
