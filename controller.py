@@ -2,6 +2,9 @@ import copy
 import os
 import pickle
 import random
+
+import pandas as pd
+import numpy as np
 from lotus_configurator import Lotus_configurator
 from main import Interpreter
 from multiprocessing import Pool
@@ -51,7 +54,7 @@ def get_interp_attributes(interp:Interpreter):
     run_updates = copy.deepcopy(interp.run_updates)
     return (as_class_list, connection_list, public_aspa_list, run_updates)
 
-def main(pickle_file, all_asns, usr_seed=None, verbose=False):
+def main(pickle_file, all_asns, usr_seed=None, verbose=False, iterations=100):
     p = Pool(6)
     if not usr_seed:
         seed = random.random()
@@ -59,13 +62,19 @@ def main(pickle_file, all_asns, usr_seed=None, verbose=False):
     else:
         seed = usr_seed
     proportions = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
-    with open(pickle_file, 'rb') as infile:
-        obj = pickle.load(infile)
-    scenario_generator = ((copy.deepcopy(obj), Lotus_configurator(1,all_asns,seed=seed,aspa_rate=i)) for i in proportions)
-    changes = p.starmap(run_scenario, scenario_generator)
-    if verbose:
-        for idx, num in enumerate(changes):
-            print(f"{int(proportions[idx] * 100)}% aspv:\t\t{num} changes")
+    results = []
+    for _ in range(iterations):
+        with open(pickle_file, 'rb') as infile:
+            obj = pickle.load(infile)
+        scenario_generator = ((copy.deepcopy(obj), Lotus_configurator(1,all_asns,seed=seed,aspa_rate=i)) for i in proportions)
+        changes = p.starmap(run_scenario, scenario_generator)
+        max_changes = changes[0]
+        results.append(list(map(lambda x: 1.0 - x/max_changes, changes)))
+        if verbose:
+            for idx, num in enumerate(changes):
+                print(f"{int(proportions[idx] * 100)}% aspv:\t\t{num} changes")
+    df = pd.DataFrame(np.array(results), columns=proportions)
+    print(df.describe())
 
 def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
     """
@@ -86,4 +95,4 @@ def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
 
 if __name__ == "__main__":
     all_asns = export_interpreter(BASE_SCENARIO, BASE_SCENARIO+".pickle")
-    main(BASE_SCENARIO+".pickle", all_asns, verbose=True, usr_seed=0.07528564395807658)
+    main(BASE_SCENARIO+".pickle", all_asns, verbose=False, usr_seed=0.07528564395807658)
