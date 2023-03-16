@@ -19,12 +19,11 @@ class Lotus_configurator:
         match self.aspa_flag:
             case 0:
                 return []
-            case 1:
+            case 1: # protect target with aspa
                 num_deploy = int(self.aspa_rate * len(self.all_asns))
-                # protect target with aspa
                 aspa_config = [Lotus_configurator.autoASPA_str.format(target, 2)]
                 aspa_config.extend([Lotus_configurator.setASPV_str.format(x, 1) for x in random.sample(self.all_asns, num_deploy)])
-                print(f"aspv deployed: {num_deploy} at {self.aspa_rate}%")
+                # print(f"aspv deployed: {num_deploy} at {self.aspa_rate}%")
                 return aspa_config
 
     def gen_attack(self):
@@ -34,6 +33,5 @@ class Lotus_configurator:
     def gen_situation(self) -> Tuple[list[str], list[str]]:
         random.seed(self.seed)
         asns, attack = self.gen_attack()
-        print(f"attack: {attack}")
         aspa = self.gen_aspa(asns[1])
         return (aspa, attack)
