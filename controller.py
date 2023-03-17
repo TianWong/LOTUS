@@ -26,9 +26,12 @@ def init_interpreter(interp_attributes):
     i.as_class_list, i.connection_list, i.public_aspa_list, i.run_updates = interp_attributes
     return i
 
-def run_scenario(interp_attributes, config: lc):
+def run_scenario(interp_attributes, config: lc, verbose=False):
     interpreter = init_interpreter(interp_attributes)
     aspa_config, attack = config.gen_situation()
+    if verbose:
+        print(aspa_config)
+        print(attack)
 
     # add ASPA/ASPV configuration
     interpreter.execute(aspa_config)
@@ -60,15 +63,16 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
         print(seed)
     else:
         seed = usr_seed
+    with open(pickle_file, 'rb') as infile:
+        obj = pickle.load(infile)
     match situation:
         case "protect_random":
+            # two random nodes, with the target protected by aspa, varying levels of aspv globally
             p = Pool(6)
             results = []
             proportions = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
             for _ in range(iterations):
-                with open(pickle_file, 'rb') as infile:
-                    obj = pickle.load(infile)
-                scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=1,attack=1,seed=seed,params={"aspv_rate":i})) for i in proportions)
+                scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=1,attack=1,seed=seed,params={"aspv_rate":i}), verbose) for i in proportions)
                 changes = p.starmap(run_scenario, scenario_gen)
                 max_changes = changes[0]
                 results.append(list(map(lambda x: 1.0 - x/max_changes, changes)))
@@ -77,7 +81,12 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
                         print(f"{int(proportions[idx] * 100)}% aspv:\t\t{num} changes")
             df = pd.DataFrame(np.array(results), columns=proportions)
             print(df.describe())
-        case _: # runs base scenario
+        case "international_edge_defense":
+            # from country a -> country b, with edge nodes with aspv
+            config = lc(obj[0],aspa=2,attack=2,seed=seed,params={"attacker":"CA", "target":"GB", "edge_node_file":"world/ranked_ca_gb_GB_edge_nodes"})
+            print(run_scenario(copy.deepcopy(obj), config, verbose))
+        case _:
+            # base scenario, no attack, aspa, aspv
             run_scenario(copy.deepcopy(obj), lc(all_asns))
 
 def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
@@ -89,7 +98,8 @@ def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
         data = infile.read()
         for line in data.split('\n'):
             if line.startswith('addAS '):
-                all_asns.append(int(line[6:]))
+                asn = line[6:].split()
+                all_asns.append(int(asn[0]))
     if pickle_flag:
         interpreter = run_base(base_scenario)
         obj = get_interp_attributes(interpreter)
@@ -99,4 +109,4 @@ def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
 
 if __name__ == "__main__":
     all_asns = export_interpreter(BASE_SCENARIO, BASE_SCENARIO+".pickle")
-    main(BASE_SCENARIO+".pickle", all_asns, "protect_random", verbose=False, usr_seed=0.07528564395807658)
+    main(BASE_SCENARIO+".pickle", all_asns, "international_edge_defense", verbose=True, usr_seed=0.07528564395807658)
