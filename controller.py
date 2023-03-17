@@ -57,7 +57,15 @@ def get_interp_attributes(interp:Interpreter):
     run_updates = copy.deepcopy(interp.run_updates)
     return (as_class_list, connection_list, public_aspa_list, run_updates)
 
-def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterations=10):
+def compare_to_worst(x, max_changes):
+    # returns relative improvement of x over max_changes
+    if max_changes != 0:
+        return 1.0 - x/max_changes
+    elif x != 0:
+        return -1.0
+    return 0.0
+
+def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterations=100):
     if not usr_seed:
         seed = random.random()
         print(seed)
@@ -68,20 +76,21 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
     match situation:
         case "protect_random":
             # two random nodes, with the target protected by aspa, varying levels of aspv globally
-            p = Pool(6)
+            p = Pool(11)
             results = []
-            proportions = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
             for _ in range(iterations):
                 scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=1,attack=1,seed=seed,params={"aspv_rate":i}), verbose) for i in proportions)
                 changes = p.starmap(run_scenario, scenario_gen)
                 max_changes = changes[0]
-                results.append(list(map(lambda x: 1.0 - x/max_changes, changes)))
+                results.append(list(map(lambda x: compare_to_worst(x, max_changes), changes)))
                 if verbose:
                     for idx, num in enumerate(changes):
                         print(f"{int(proportions[idx] * 100)}% aspv:\t\t{num} changes")
             seed += 1
             df = pd.DataFrame(np.array(results), columns=proportions)
             print(df.describe())
+            return df
         case "international_edge_defense":
             # from country a -> country b, with edge nodes with aspv
             p = Pool(6)
@@ -97,13 +106,14 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
                                  for i in proportions)
                 changes = p.starmap(run_scenario, scenario_gen)
                 max_changes = changes[0]
-                results.append(list(map(lambda x: 1.0 - x/max_changes, changes)))
+                results.append(list(map(lambda x: compare_to_worst(x, max_changes), changes)))
                 if verbose:
                     for idx, num in enumerate(changes):
                         print(f"{int(proportions[idx] * 100)}% aspv at edge:\t\t{num} changes")
                 seed += 1
             df = pd.DataFrame(np.array(results), columns=proportions)
             print(df.describe())
+            return df
         case _:
             # base scenario, no attack, aspa, aspv
             run_scenario(copy.deepcopy(obj), lc(all_asns))
@@ -128,4 +138,4 @@ def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
 
 if __name__ == "__main__":
     all_asns = export_interpreter(BASE_SCENARIO, BASE_SCENARIO+".pickle")
-    main(BASE_SCENARIO+".pickle", all_asns, "international_edge_defense", verbose=True, usr_seed=0.07528564395807658)
+    main(BASE_SCENARIO+".pickle", all_asns, "protect_random", verbose=False, usr_seed=0.07528564395807658)
