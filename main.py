@@ -19,9 +19,11 @@ class IP_address_generator:
     return address
 
 class AS_class:
-  def __init__(self, asn, address):
+  def __init__(self, asn, address, country, rank):
     self.as_number = asn
     self.network_address = address
+    self.country = country
+    self.rank = rank
     self.policy = ["LocPrf", "PathLength"]
     self.routing_table = Routing_table(self.network_address, self.policy)
 
@@ -117,9 +119,9 @@ class AS_class_list:
     self.class_list = {}
     self.ip_gen = IP_address_generator()
 
-  def add_AS(self, as_number):
+  def add_AS(self, as_number, country=None, rank=100):
     if not as_number in self.class_list.keys():
-      self.class_list[as_number] = AS_class(as_number, self.ip_gen.get_unique_address())
+      self.class_list[as_number] = AS_class(as_number, self.ip_gen.get_unique_address(), country, rank)
     else:
       print("Error: AS " + str(as_number) + " is already registered.", file=sys.stderr)
 
@@ -364,10 +366,16 @@ class Interpreter(Cmd):
     return True
 
   def do_addAS(self, line):
-    if line.isdecimal():
-      self.as_class_list.add_AS(line)
+    param = line.split()
+    if len(param) == 1:
+      if line.split()[0].isdecimal():
+        self.as_class_list.add_AS(line)
+    elif len(param) == 3:
+      ls = line.split()
+      if ls[0].isdecimal() and ls[2].isdecimal():
+        self.as_class_list.add_AS(ls[0], ls[1], int(ls[2]))
     else:
-      print("Usage: addAS [asn]", file=sys.stderr)
+      print("Usage: addAS [asn] [country] [rank]", file=sys.stderr)
 
   def do_showAS(self, line):
     if line.isdecimal():
