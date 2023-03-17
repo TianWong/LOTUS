@@ -68,7 +68,7 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
             for _ in range(iterations):
                 with open(pickle_file, 'rb') as infile:
                     obj = pickle.load(infile)
-                scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=1,attack=1,seed=seed,aspa_rate=i)) for i in proportions)
+                scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=1,attack=1,seed=seed,params={"aspv_rate":i})) for i in proportions)
                 changes = p.starmap(run_scenario, scenario_gen)
                 max_changes = changes[0]
                 results.append(list(map(lambda x: 1.0 - x/max_changes, changes)))
