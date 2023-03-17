@@ -79,12 +79,31 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
                 if verbose:
                     for idx, num in enumerate(changes):
                         print(f"{int(proportions[idx] * 100)}% aspv:\t\t{num} changes")
+            seed += 1
             df = pd.DataFrame(np.array(results), columns=proportions)
             print(df.describe())
         case "international_edge_defense":
             # from country a -> country b, with edge nodes with aspv
-            config = lc(obj[0],aspa=2,attack=2,seed=seed,params={"attacker":"CA", "target":"GB", "edge_node_file":"world/ranked_ca_gb_GB_edge_nodes"})
-            print(run_scenario(copy.deepcopy(obj), config, verbose))
+            p = Pool(6)
+            results = []
+            proportions = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+            for _ in range(iterations):
+                scenario_gen = ((copy.deepcopy(obj), 
+                                 lc(obj[0],aspa=2,attack=2,seed=seed,
+                                    params={"attacker":"CA", "target":"GB", 
+                                            "edge_node_file":"world/ranked_ca_gb_GB_edge_nodes", 
+                                            "aspv_rate":i}),
+                                 verbose)
+                                 for i in proportions)
+                changes = p.starmap(run_scenario, scenario_gen)
+                max_changes = changes[0]
+                results.append(list(map(lambda x: 1.0 - x/max_changes, changes)))
+                if verbose:
+                    for idx, num in enumerate(changes):
+                        print(f"{int(proportions[idx] * 100)}% aspv at edge:\t\t{num} changes")
+                seed += 1
+            df = pd.DataFrame(np.array(results), columns=proportions)
+            print(df.describe())
         case _:
             # base scenario, no attack, aspa, aspv
             run_scenario(copy.deepcopy(obj), lc(all_asns))

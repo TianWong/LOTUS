@@ -36,6 +36,8 @@ class Lotus_configurator:
                 target = asns[1]
                 with open(self.params["edge_node_file"], "r") as in_file:
                     edge_nodes = json.load(in_file)
+                num_deploy = int(float(self.params["aspv_rate"]) * len(edge_nodes))
+                edge_nodes = random.sample(edge_nodes, num_deploy)
                 aspa_config = [Lotus_configurator.autoASPA_str.format(target,5)]
                 aspa_config.extend([Lotus_configurator.setASPV_str.format(x, 1) for x in edge_nodes])
                 return aspa_config
