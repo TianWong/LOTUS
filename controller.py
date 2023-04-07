@@ -42,12 +42,16 @@ def run_scenario(interp_attributes, config: lc, verbose=False):
     interpreter.do_run("diff")
 
     updates = interpreter.run_updates
-    # changes = 0
-    # for idx, val in enumerate(updates):
-    #     old, new = val
-    #     print(f"change {idx}\nold: {old}\nnew: {new}\n")
-    #     changes += 1
-    # return changes
+    
+    # edge defense
+    if config.attack_flag == 2:
+        count = 0
+        target_country = config.params["target"]
+        for prev_best, route_diff in updates:
+            target_as = route_diff["path"].split("-")[0]
+            if config.all_asns.class_list[target_as].country == target_country:
+                count += 1
+        return count
     return len(updates)
 
 def get_interp_attributes(interp:Interpreter):
@@ -87,7 +91,7 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
                 if verbose:
                     for idx, num in enumerate(changes):
                         print(f"{int(proportions[idx] * 100)}% aspv:\t\t{num} changes")
-            seed += 1
+                seed += 1
             df = pd.DataFrame(np.array(results), columns=proportions)
             print(df.describe())
             return df
@@ -138,4 +142,4 @@ def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
 
 if __name__ == "__main__":
     all_asns = export_interpreter(BASE_SCENARIO, BASE_SCENARIO+".pickle")
-    main(BASE_SCENARIO+".pickle", all_asns, "protect_random", verbose=False, usr_seed=0.07528564395807658)
+    main(BASE_SCENARIO+".pickle", all_asns, "protect_random", verbose=False)
