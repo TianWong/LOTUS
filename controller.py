@@ -118,6 +118,22 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
             df = pd.DataFrame(np.array(results), columns=proportions)
             print(df.describe())
             return df
+        case "aspa_random":
+            p = Pool(os.cpu_count())
+            results = np.zeros(9)
+            proportions = [0.0, 0.1, 0.25]
+            for _ in range(iterations):
+                scenario_gen = ((copy.deepcopy(obj), 
+                                lc(all_asns,aspa=3,attack=1,seed=seed,
+                                    params={"aspa_rate":i,"aspv_rate":j}), 
+                                verbose) 
+                                for i in proportions for j in proportions)
+                changes = p.starmap(run_scenario, scenario_gen)
+                max_changes = changes[0]
+                results += np.array(list(map(lambda x: compare_to_worst(x, max_changes), changes)))
+                seed += 1
+            # return results.reshape(3,3) / iterations
+            return results / iterations
         case _:
             # base scenario, no attack, aspa, aspv
             run_scenario(copy.deepcopy(obj), lc(all_asns))
@@ -142,4 +158,4 @@ def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
 
 if __name__ == "__main__":
     all_asns = export_interpreter(BASE_SCENARIO, BASE_SCENARIO+".pickle")
-    main(BASE_SCENARIO+".pickle", all_asns, "protect_random", verbose=False)
+    main(BASE_SCENARIO+".pickle", all_asns, "", verbose=False)

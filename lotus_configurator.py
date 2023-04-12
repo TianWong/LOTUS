@@ -18,29 +18,34 @@ class Lotus_configurator:
         self.params = params
 
     def gen_aspa(self, asns) -> list[str]:
+        if len(asns) == 0:
+            return []
+        target = asns[1]
         match self.aspa_flag:
             case 1: # protect target with aspa
-                if len(asns) == 0:
-                    return []
-                target = asns[1]
                 num_deploy = int(float(self.params["aspv_rate"]) * len(self.all_asns))
-                aspa_config = [Lotus_configurator.autoASPA_str.format(target, 5)]
-                aspa_config.extend([Lotus_configurator.setASPV_str.format(x, 1) for x in random.sample(self.all_asns, num_deploy)])
+                aspa_config = [self.autoASPA_str.format(target, 5)]
+                aspa_config.extend([self.setASPV_str.format(x, 1) for x in random.sample(self.all_asns, num_deploy)])
                 # print(f"aspv deployed: {num_deploy} at {float(self.params["aspv_rate"])}%")
                 return aspa_config
             case 2:
                 # get edge nodes of target country, set aspv there
                 # protect target with aspa
-                if len(asns) == 0:
-                    return []
-                target = asns[1]
                 with open(self.params["edge_node_file"], "r") as in_file:
                     edge_nodes = json.load(in_file)
                 num_deploy = int(float(self.params["aspv_rate"]) * len(edge_nodes))
                 edge_nodes = random.sample(edge_nodes, num_deploy)
-                aspa_config = [Lotus_configurator.autoASPA_str.format(target, 5)]
-                aspa_config.extend([Lotus_configurator.setASPV_str.format(x, 1) for x in edge_nodes])
+                aspa_config = [self.autoASPA_str.format(target, 5)]
+                aspa_config.extend([self.setASPV_str.format(x, 1) for x in edge_nodes])
                 return aspa_config
+            case 3:
+                # variable aspv and aspa
+                aspa_deploy = int(float(self.params["aspa_rate"]) * len(self.all_asns)) # account for aspa at target
+                aspv_deploy = int(float(self.params["aspv_rate"]) * len(self.all_asns))
+                config = [self.autoASPA_str.format(target, 5)]
+                config.extend([self.autoASPA_str.format(x, 5) for x in random.sample(self.all_asns, aspa_deploy)])
+                config.extend([self.setASPV_str.format(x, 1) for x in random.sample(self.all_asns, aspv_deploy)])
+                return config
             case _:
                 return []
 
@@ -48,7 +53,7 @@ class Lotus_configurator:
         match self.attack_flag:
             case 1:
                 asns = random.sample(self.all_asns, 2)
-                return (asns, [Lotus_configurator.attack_str.format(asns[0], asns[1])])
+                return (asns, [self.attack_str.format(asns[0], asns[1])])
             case 2:
                 attacker_asn = None
                 target_asn = None
@@ -61,7 +66,7 @@ class Lotus_configurator:
                         target_asn = val
                 asns = [attacker_asn.as_number, target_asn.as_number]
                 return (asns,
-                        [Lotus_configurator.attack_str.format(asns[0], asns[1])])
+                        [self.attack_str.format(asns[0], asns[1])])
             case _:
                 return ([],[])
     
