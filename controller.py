@@ -1,4 +1,5 @@
 import copy
+import gc
 import os
 import pickle
 import random
@@ -61,7 +62,7 @@ def get_interp_attributes(interp:Interpreter):
     run_updates = copy.deepcopy(interp.run_updates)
     return (as_class_list, connection_list, public_aspa_list, run_updates)
 
-def compare_to_worst(x, max_changes):
+def compare_to_worst(x, max_changes) -> float:
     # returns relative improvement of x over max_changes
     if max_changes != 0:
         return 1.0 - x/max_changes
@@ -119,21 +120,25 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
             print(df.describe())
             return df
         case "aspa_random":
-            p = Pool(os.cpu_count())
-            results = np.zeros(9)
-            proportions = [0.0, 0.1, 0.25]
-            for _ in range(iterations):
-                scenario_gen = ((copy.deepcopy(obj), 
-                                lc(all_asns,aspa=3,attack=1,seed=seed,
-                                    params={"aspa_rate":i,"aspv_rate":j}), 
-                                verbose) 
-                                for i in proportions for j in proportions)
-                changes = p.starmap(run_scenario, scenario_gen)
-                max_changes = changes[0]
-                results += np.array(list(map(lambda x: compare_to_worst(x, max_changes), changes)))
-                seed += 1
-            # return results.reshape(3,3) / iterations
-            return results / iterations
+            p = Pool(5)
+            results = []
+            proportions = [0.0, 0.1, 0.2, 0.4, 1.0]
+            for i in proportions:
+                iterseed = seed
+                aspv_iter_results = np.zeros(5)
+                for _ in range(iterations):
+                    scenario_gen = ((copy.deepcopy(obj), 
+                                    lc(all_asns,aspa=3,attack=1,seed=iterseed,
+                                        params={"aspa_rate":i,"aspv_rate":j}), 
+                                    verbose) 
+                                    for j in proportions)
+                    changes = p.starmap(run_scenario, scenario_gen)
+                    max_changes = changes[0]
+                    aspv_iter_results += np.fromiter(map(lambda x: compare_to_worst(x, max_changes), changes), dtype=float)
+                    iterseed += 1
+                results.append(aspv_iter_results / iterations)
+                gc.collect()
+            return np.array(results)
         case _:
             # base scenario, no attack, aspa, aspv
             run_scenario(copy.deepcopy(obj), lc(all_asns))
