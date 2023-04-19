@@ -70,7 +70,7 @@ def compare_to_worst(x, max_changes) -> float:
         return -1.0
     return 0.0
 
-def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterations=100):
+def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=False, iterations=100):
     if not usr_seed:
         seed = random.random()
         print(seed)
@@ -85,7 +85,7 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
             results = []
             proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
             for _ in range(iterations):
-                scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=1,attack=1,seed=seed,params={"aspv_rate":i}), verbose) for i in proportions)
+                scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=1,attack=1,seed=seed,params={"aspv_rate":i, "aspv_level":aspv_level}), verbose) for i in proportions)
                 changes = p.starmap(run_scenario, scenario_gen)
                 max_changes = changes[0]
                 results.append(list(map(lambda x: compare_to_worst(x, max_changes), changes)))
@@ -106,7 +106,7 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
                                  lc(obj[0],aspa=2,attack=2,seed=seed,
                                     params={"attacker":"CA", "target":"GB", 
                                             "edge_node_file":"world/ranked_ca_gb_GB_edge_nodes", 
-                                            "aspv_rate":i}),
+                                            "aspv_rate":i, "aspv_level":aspv_level}),
                                  verbose)
                                  for i in proportions)
                 changes = p.starmap(run_scenario, scenario_gen)
@@ -129,7 +129,7 @@ def main(pickle_file, all_asns, situation, usr_seed=None, verbose=False, iterati
                 for _ in range(iterations):
                     scenario_gen = ((copy.deepcopy(obj), 
                                     lc(all_asns,aspa=3,attack=1,seed=iterseed,
-                                        params={"aspa_rate":i,"aspv_rate":j}), 
+                                        params={"aspa_rate":i,"aspv_rate":j, "aspv_level":aspv_level}), 
                                     verbose) 
                                     for j in proportions)
                     changes = p.starmap(run_scenario, scenario_gen)

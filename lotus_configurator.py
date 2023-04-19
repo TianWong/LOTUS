@@ -1,13 +1,14 @@
 import json
 import random
 from typing import Tuple
+ASPA_DISTANCE = 5
 
 class Lotus_configurator:
     setASPV_str = "setASPV {} on {}"
     autoASPA_str = "autoASPA {} {}"
     attack_str = "genAttack {} {}"
 
-    def __init__(self, all_asns, aspa=0, attack=0, seed=None, params={}):
+    def __init__(self, all_asns, aspa=0, attack=0, seed=None, params={"aspv_level":1}):
         if seed:
             self.seed = seed
         else:
@@ -24,8 +25,8 @@ class Lotus_configurator:
         match self.aspa_flag:
             case 1: # protect target with aspa
                 num_deploy = int(float(self.params["aspv_rate"]) * len(self.all_asns))
-                aspa_config = [self.autoASPA_str.format(target, 5)]
-                aspa_config.extend([self.setASPV_str.format(x, 1) for x in random.sample(self.all_asns, num_deploy)])
+                aspa_config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
+                aspa_config.extend([self.setASPV_str.format(x, self.params["aspv_level"]) for x in random.sample(self.all_asns, num_deploy)])
                 # print(f"aspv deployed: {num_deploy} at {float(self.params["aspv_rate"])}%")
                 return aspa_config
             case 2:
@@ -35,16 +36,16 @@ class Lotus_configurator:
                     edge_nodes = json.load(in_file)
                 num_deploy = int(float(self.params["aspv_rate"]) * len(edge_nodes))
                 edge_nodes = random.sample(edge_nodes, num_deploy)
-                aspa_config = [self.autoASPA_str.format(target, 5)]
-                aspa_config.extend([self.setASPV_str.format(x, 1) for x in edge_nodes])
+                aspa_config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
+                aspa_config.extend([self.setASPV_str.format(x, self.params["aspv_level"]) for x in edge_nodes])
                 return aspa_config
             case 3:
                 # variable aspv and aspa
                 aspa_deploy = int(float(self.params["aspa_rate"]) * len(self.all_asns)) # account for aspa at target
                 aspv_deploy = int(float(self.params["aspv_rate"]) * len(self.all_asns))
-                config = [self.autoASPA_str.format(target, 5)]
-                config.extend([self.autoASPA_str.format(x, 5) for x in random.sample(self.all_asns, aspa_deploy)])
-                config.extend([self.setASPV_str.format(x, 1) for x in random.sample(self.all_asns, aspv_deploy)])
+                config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
+                config.extend([self.autoASPA_str.format(x, ASPA_DISTANCE) for x in random.sample(self.all_asns, aspa_deploy)])
+                config.extend([self.setASPV_str.format(x, self.params["aspv_level"]) for x in random.sample(self.all_asns, aspv_deploy)])
                 return config
             case _:
                 return []
