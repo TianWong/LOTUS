@@ -122,18 +122,24 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
         case "aspa_random":
             p = Pool(5)
             results = []
+            max_changes_ls = []
             proportions = [0.0, 0.1, 0.2, 0.4, 1.0]
             for i in proportions:
                 iterseed = seed
                 aspv_iter_results = np.zeros(5)
-                for _ in range(iterations):
+                for it in range(iterations):
                     scenario_gen = ((copy.deepcopy(obj), 
                                     lc(all_asns,aspa=3,attack=1,seed=iterseed,
                                         params={"aspa_rate":i,"aspv_rate":j, "aspv_level":aspv_level}), 
                                     verbose) 
                                     for j in proportions)
                     changes = p.starmap(run_scenario, scenario_gen)
-                    max_changes = changes[0]
+                    
+                    if i == 0.0:
+                        max_changes = changes[0]
+                        max_changes_ls.append(max_changes)
+                    else:
+                        max_changes = max_changes_ls[it]
                     aspv_iter_results += np.fromiter(map(lambda x: compare_to_worst(x, max_changes), changes), dtype=float)
                     iterseed += 1
                 results.append(aspv_iter_results / iterations)
