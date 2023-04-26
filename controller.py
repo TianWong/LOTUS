@@ -10,7 +10,7 @@ from lotus_configurator import Lotus_configurator as lc
 from main import Interpreter
 from multiprocessing import Pool
 
-BASE_SCENARIO = './world/ranked_ca_gb.lotus'
+BASE_SCENARIO = './ca_gb/ca_gb_cleaned_ranked.lotus'
 
 def run_base(base_scenario):
     if os.path.isfile(base_scenario):
