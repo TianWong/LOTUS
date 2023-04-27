@@ -120,13 +120,13 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
             print(df.describe())
             return df
         case "aspa_random":
-            p = Pool(5)
+            p = Pool(8)
             results = []
             max_changes_ls = []
-            proportions = [0.0, 0.1, 0.2, 0.4, 1.0]
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]
             for i in proportions:
                 iterseed = seed
-                aspv_iter_results = np.zeros(5)
+                aspv_iter_results = np.zeros(8)
                 for it in range(iterations):
                     scenario_gen = ((copy.deepcopy(obj), 
                                     lc(all_asns,aspa=3,attack=1,seed=iterseed,
