@@ -23,10 +23,12 @@ class Lotus_configurator:
             return []
         target = asns[1]
         match self.aspa_flag:
-            case 1: # protect target with aspa
-                num_deploy = int(float(self.params["aspv_rate"]) * len(self.all_asns))
+            case 1:
+                # variable aspv and aspa together
+                num_deploy = int(float(self.params["rate"]) * len(self.all_asns))
                 aspa_config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
-                aspa_config.extend([self.setASPV_str.format(x, self.params["aspv_level"]) for x in random.sample(self.all_asns, num_deploy)])
+                for x in random.sample(self.all_asns, num_deploy):
+                    aspa_config.extend([self.autoASPA_str.format(x, ASPA_DISTANCE), self.setASPV_str.format(x, self.params["aspv_level"])])
                 # print(f"aspv deployed: {num_deploy} at {float(self.params["aspv_rate"])}%")
                 return aspa_config
             case 2:
@@ -46,6 +48,18 @@ class Lotus_configurator:
                 config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
                 config.extend([self.autoASPA_str.format(x, ASPA_DISTANCE) for x in random.sample(self.all_asns, aspa_deploy)])
                 config.extend([self.setASPV_str.format(x, self.params["aspv_level"]) for x in random.sample(self.all_asns, aspv_deploy)])
+                return config
+            case 4:
+                # variable aspa+aspv and aspv level
+                num_deploy = int(float(self.params["rate"]) * len(self.all_asns))
+                config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
+                as_ls = random.sample(self.all_asns, num_deploy)
+                aspv_1_ls = random.sample(as_ls, int(float(self.params["aspv_1_rate"]) * len(as_ls)))
+                for x in as_ls:
+                    level = 2
+                    if x in aspv_1_ls:
+                        level = 1
+                    config.extend([self.autoASPA_str.format(x, ASPA_DISTANCE), self.setASPV_str.format(x, level)])
                 return config
             case _:
                 return []
