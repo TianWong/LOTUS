@@ -32,14 +32,12 @@ class Lotus_configurator:
                 # print(f"aspv deployed: {num_deploy} at {float(self.params["aspv_rate"])}%")
                 return aspa_config
             case 2:
-                # get edge nodes of target country, set aspv there
-                # protect target with aspa
-                with open(self.params["edge_node_file"], "r") as in_file:
-                    edge_nodes = json.load(in_file)
-                num_deploy = int(float(self.params["aspv_rate"]) * len(edge_nodes))
-                edge_nodes = random.sample(edge_nodes, num_deploy)
+                # aspa+aspv at target country
+                asn_cl = list(self.all_asns.class_list.values())
+                target_country_asns = list(filter(lambda x: x.country == self.params["target"], asn_cl))
+                num_deploy = int(float(self.params["rate"]) * len(target_country_asns))
                 aspa_config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
-                aspa_config.extend([self.setASPV_str.format(x, self.params["aspv_level"]) for x in edge_nodes])
+                aspa_config.extend([self.setASPV_str.format(x.as_number, self.params["aspv_level"]) for x in random.sample(target_country_asns, num_deploy)])
                 return aspa_config
             case 3:
                 # variable aspv and aspa
@@ -70,16 +68,16 @@ class Lotus_configurator:
                 asns = random.sample(self.all_asns, 2)
                 return (asns, [self.attack_str.format(asns[0], asns[1])])
             case 2:
-                attacker_asn = None
                 target_asn = None
+                with open(self.params["edge_node_file"], "r") as in_file:
+                    edge_nodes = json.load(in_file)
+                attacker_asn = random.sample(edge_nodes, 1)[0]
                 asn_cl = list(self.all_asns.class_list.values())
-                while attacker_asn == None or target_asn == None:
+                while target_asn == None:
                     val = random.sample(asn_cl, 1)[0]
-                    if val.country == self.params["attacker"] and attacker_asn == None:
-                        attacker_asn = val
-                    elif val.country == self.params["target"] and target_asn == None:
+                    if val.country == self.params["target"]:
                         target_asn = val
-                asns = [attacker_asn.as_number, target_asn.as_number]
+                asns = [attacker_asn, target_asn.as_number]
                 return (asns,
                         [self.attack_str.format(asns[0], asns[1])])
             case _:

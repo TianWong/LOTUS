@@ -96,7 +96,7 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
             df = pd.DataFrame(np.array(results), columns=proportions)
             print(df.describe())
             return df
-        case "international_edge_defense":
+        case "international_defense":
             # from country a -> country b, with edge nodes with aspv
             p = Pool(6)
             results = []
@@ -105,8 +105,8 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
                 scenario_gen = ((copy.deepcopy(obj), 
                                  lc(obj[0],aspa=2,attack=2,seed=seed,
                                     params={"attacker":"CA", "target":"GB", 
-                                            "edge_node_file":"world/ranked_ca_gb_GB_edge_nodes", 
-                                            "aspv_rate":i, "aspv_level":aspv_level}),
+                                            "edge_node_file":"ca_gb/ca_gb_cleaned_ranked_CA_edge_nodes", 
+                                            "rate":i, "aspv_level":aspv_level}),
                                  verbose)
                                  for i in proportions)
                 changes = p.starmap(run_scenario, scenario_gen)
