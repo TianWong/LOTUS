@@ -4,7 +4,7 @@ from typing import Tuple
 ASPA_DISTANCE = 5
 
 class Lotus_configurator:
-    setASPV_str = "setASPV {} on {}"
+    setASPV_str = "setASPV {} on {} {}"
     autoASPA_str = "autoASPA {} {}"
     attack_str = "genAttack {} {}"
 
@@ -22,13 +22,18 @@ class Lotus_configurator:
         if len(asns) == 0:
             return []
         target = asns[1]
+        aspv_local_prf = ""
+        if "aspv_local_prf" in self.params:
+            aspv_local_prf = self.params["aspv_local_prf"]
         match self.aspa_flag:
             case 1:
                 # variable aspv and aspa together
                 num_deploy = int(float(self.params["rate"]) * len(self.all_asns))
                 aspa_config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
                 for x in random.sample(self.all_asns, num_deploy):
-                    aspa_config.extend([self.autoASPA_str.format(x, ASPA_DISTANCE), self.setASPV_str.format(x, self.params["aspv_level"])])
+                    aspa_config.extend(
+                        [self.autoASPA_str.format(x, ASPA_DISTANCE), 
+                         self.setASPV_str.format(x, self.params["aspv_level"], aspv_local_prf)])
                 # print(f"aspv deployed: {num_deploy} at {float(self.params["aspv_rate"])}%")
                 return aspa_config
             case 2:
@@ -37,7 +42,10 @@ class Lotus_configurator:
                 target_country_asns = list(filter(lambda x: x.country == self.params["target"], asn_cl))
                 num_deploy = int(float(self.params["rate"]) * len(target_country_asns))
                 aspa_config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
-                aspa_config.extend([self.setASPV_str.format(x.as_number, self.params["aspv_level"]) for x in random.sample(target_country_asns, num_deploy)])
+                for x in random.sample(target_country_asns, num_deploy):
+                    aspa_config.extend(
+                        [self.autoASPA_str.format(x.as_number, ASPA_DISTANCE), 
+                         self.setASPV_str.format(x.as_number, self.params["aspv_level"], aspv_local_prf)])
                 return aspa_config
             case 3:
                 # variable aspv and aspa
@@ -45,7 +53,9 @@ class Lotus_configurator:
                 aspv_deploy = int(float(self.params["aspv_rate"]) * len(self.all_asns))
                 config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
                 config.extend([self.autoASPA_str.format(x, ASPA_DISTANCE) for x in random.sample(self.all_asns, aspa_deploy)])
-                config.extend([self.setASPV_str.format(x, self.params["aspv_level"]) for x in random.sample(self.all_asns, aspv_deploy)])
+                config.extend(
+                    [self.setASPV_str.format(x, self.params["aspv_level"], aspv_local_prf) 
+                     for x in random.sample(self.all_asns, aspv_deploy)])
                 return config
             case 4:
                 # variable aspa+aspv and aspv level
@@ -57,8 +67,26 @@ class Lotus_configurator:
                     level = 2
                     if x in aspv_1_ls:
                         level = 1
-                    config.extend([self.autoASPA_str.format(x, ASPA_DISTANCE), self.setASPV_str.format(x, level)])
+                    config.extend(
+                        [self.autoASPA_str.format(x, ASPA_DISTANCE), 
+                         self.setASPV_str.format(x, level, aspv_local_prf)])
                 return config
+            case 5:
+                # combination of 2 and 4
+                asn_cl = list(self.all_asns.class_list.values())
+                target_country_asns = list(filter(lambda x: x.country == self.params["target"], asn_cl))
+                num_deploy = int(float(self.params["rate"]) * len(target_country_asns))
+                aspa_config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
+                as_ls = random.sample(target_country_asns, num_deploy)
+                aspv_1_ls = random.sample(as_ls, int(float(self.params["aspv_1_rate"]) * len(as_ls)))
+                for x in as_ls:
+                    level = 2
+                    if x in aspv_1_ls:
+                        level = 1
+                    aspa_config.extend(
+                        [self.autoASPA_str.format(x.as_number, ASPA_DISTANCE), 
+                         self.setASPV_str.format(x.as_number, level, aspv_local_prf)])
+                return aspa_config
             case _:
                 return []
 

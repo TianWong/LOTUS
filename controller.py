@@ -79,7 +79,7 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
     with open(pickle_file, 'rb') as infile:
         obj = pickle.load(infile)
     match situation:
-        case "protect_random":
+        case "random_joint_aspa_aspv":
             # random attacker and target, protected by aspa/aspv, varying joint aspa+aspv globally
             p = Pool(11)
             results = []
@@ -94,13 +94,80 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
                         print(f"{int(proportions[idx] * 100)}% deployment:\t\t{num} changes")
                 seed += 1
             df = pd.DataFrame(np.array(results), columns=proportions)
-            print(df.describe())
             return df
-        case "international_defense":
-            # from country a -> country b, with edge nodes with aspv
-            p = Pool(6)
+        case "random_joint_aspa_aspv_loc_perf":
+            # random attacker and target, protected by aspa/aspv, varying joint aspa+aspv globally
+            p = Pool(11)
             results = []
-            proportions = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+            for _ in range(iterations):
+                scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=1,attack=1,seed=seed,params={"rate":i,"aspv_level":aspv_level, "aspv_local_prf":"True"}), verbose) for i in proportions)
+                changes = p.starmap(run_scenario, scenario_gen)
+                max_changes = changes[0]
+                results.append(list(map(lambda x: compare_to_worst(x, max_changes), changes)))
+                if verbose:
+                    for idx, num in enumerate(changes):
+                        print(f"{int(proportions[idx] * 100)}% deployment:\t\t{num} changes")
+                seed += 1
+            df = pd.DataFrame(np.array(results), columns=proportions)
+            return df
+        case "random_joint_aspa_aspv_level":
+            # random attacker and target, protected by aspa/aspv, varying aspv 1/2
+            p = Pool(8)
+            results = []
+            max_changes_ls = []
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]
+            for i in proportions:
+                iterseed = seed
+                aspv_iter_results = np.zeros(8)
+                for it in range(iterations):
+                    scenario_gen = ((copy.deepcopy(obj), 
+                                    lc(all_asns,aspa=4,attack=1,seed=iterseed,
+                                        params={"rate":i,"aspv_1_rate":j}), 
+                                    verbose) 
+                                    for j in proportions)
+                    changes = p.starmap(run_scenario, scenario_gen)
+                    if i == 0.0:
+                        max_changes = changes[0]
+                        max_changes_ls.append(max_changes)
+                    else:
+                        max_changes = max_changes_ls[it]
+                    aspv_iter_results += np.fromiter(map(lambda x: compare_to_worst(x, max_changes), changes), dtype=float)
+                    iterseed += 1
+                results.append(aspv_iter_results / iterations)
+                gc.collect()
+            return np.array(results)
+        case "random_joint_aspa_aspv_level_loc_prf":
+            # random attacker and target, protected by aspa/aspv, varying aspv 1/2, loc_prf adjustment
+            p = Pool(8)
+            results = []
+            max_changes_ls = []
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]
+            for i in proportions:
+                iterseed = seed
+                aspv_iter_results = np.zeros(8)
+                for it in range(iterations):
+                    scenario_gen = ((copy.deepcopy(obj), 
+                                    lc(all_asns,aspa=4,attack=1,seed=iterseed,
+                                        params={"rate":i,"aspv_1_rate":j,"aspv_local_prf":"True"}), 
+                                    verbose) 
+                                    for j in proportions)
+                    changes = p.starmap(run_scenario, scenario_gen)
+                    if i == 0.0:
+                        max_changes = changes[0]
+                        max_changes_ls.append(max_changes)
+                    else:
+                        max_changes = max_changes_ls[it]
+                    aspv_iter_results += np.fromiter(map(lambda x: compare_to_worst(x, max_changes), changes), dtype=float)
+                    iterseed += 1
+                results.append(aspv_iter_results / iterations)
+                gc.collect()
+            return np.array(results)
+        case "international_defense":
+            # from country a edge -> country b, joint aspa+aspv
+            p = Pool(8)
+            results = []
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]
             for _ in range(iterations):
                 scenario_gen = ((copy.deepcopy(obj), 
                                  lc(obj[0],aspa=2,attack=2,seed=seed,
@@ -117,9 +184,36 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
                         print(f"{int(proportions[idx] * 100)}% aspv at edge:\t\t{num} changes")
                 seed += 1
             df = pd.DataFrame(np.array(results), columns=proportions)
-            print(df.describe())
             return df
-        case "aspa_random":
+        case "international_defense_aspv_level":
+            # from country a edge -> country b, joint aspa+aspv, varying aspv 1/2
+            p = Pool(8)
+            results = []
+            max_changes_ls = []
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]
+            for i in proportions:
+                iterseed = seed
+                aspv_iter_results = np.zeros(8)
+                for it in range(iterations):
+                    scenario_gen = ((copy.deepcopy(obj), 
+                                 lc(obj[0],aspa=5,attack=2,seed=iterseed,
+                                    params={"attacker":"CA", "target":"GB", 
+                                            "edge_node_file":"ca_gb/ca_gb_cleaned_ranked_CA_edge_nodes", 
+                                            "rate":i, "aspv_1_rate":j, "aspv_level":aspv_level}),
+                                 verbose) 
+                                    for j in proportions)
+                    changes = p.starmap(run_scenario, scenario_gen)
+                    if i == 0.0:
+                        max_changes = changes[0]
+                        max_changes_ls.append(max_changes)
+                    else:
+                        max_changes = max_changes_ls[it]
+                    aspv_iter_results += np.fromiter(map(lambda x: compare_to_worst(x, max_changes), changes), dtype=float)
+                    iterseed += 1
+                results.append(aspv_iter_results / iterations)
+                gc.collect()
+            return np.array(results)
+        case "random_aspa_aspv":
             # varying aspa and aspv independent of one another
             p = Pool(8)
             results = []
@@ -132,33 +226,6 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
                     scenario_gen = ((copy.deepcopy(obj), 
                                     lc(all_asns,aspa=3,attack=1,seed=iterseed,
                                         params={"aspa_rate":i,"aspv_rate":j, "aspv_level":aspv_level}), 
-                                    verbose) 
-                                    for j in proportions)
-                    changes = p.starmap(run_scenario, scenario_gen)
-                    
-                    if i == 0.0:
-                        max_changes = changes[0]
-                        max_changes_ls.append(max_changes)
-                    else:
-                        max_changes = max_changes_ls[it]
-                    aspv_iter_results += np.fromiter(map(lambda x: compare_to_worst(x, max_changes), changes), dtype=float)
-                    iterseed += 1
-                results.append(aspv_iter_results / iterations)
-                gc.collect()
-            return np.array(results)
-        case "vary_aspv_level":
-            # random attacker and target, protected by aspa/aspv, varying joint aspa+aspv globally
-            p = Pool(8)
-            results = []
-            max_changes_ls = []
-            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]
-            for i in proportions:
-                iterseed = seed
-                aspv_iter_results = np.zeros(8)
-                for it in range(iterations):
-                    scenario_gen = ((copy.deepcopy(obj), 
-                                    lc(all_asns,aspa=4,attack=1,seed=iterseed,
-                                        params={"rate":i,"aspv_1_rate":j}), 
                                     verbose) 
                                     for j in proportions)
                     changes = p.starmap(run_scenario, scenario_gen)
@@ -196,5 +263,5 @@ def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
     return all_asns
 
 if __name__ == "__main__":
-    all_asns = export_interpreter(BASE_SCENARIO, BASE_SCENARIO+".pickle")
+    all_asns = export_interpreter(BASE_SCENARIO, BASE_SCENARIO+".pickle", pickle_flag=True)
     main(BASE_SCENARIO+".pickle", all_asns, "", verbose=False)

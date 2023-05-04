@@ -93,6 +93,8 @@ class AS_class:
     elif message["switch"] == "off":
       self.policy = ["LocPrf", "PathLength"]
     self.routing_table.change_policy(self.policy)
+    if "aspv_local_prf" in message:
+      self.routing_table.change_aspv_local_prf(message["aspv_local_prf"] == "True")
 
   def receive_init(self, init_message):
     best_path_list = self.routing_table.get_best_path_list()
@@ -156,6 +158,10 @@ class Routing_table:
     self.table[network] = [{"path": "i", "come_from": "customer", "LocPrf": 1000, "best_path": True}]
     self.policy = policy
     self.aspa_list = {}
+    self.aspv_local_prf = False
+  
+  def change_aspv_local_prf(self, prf):
+    self.aspv_local_prf = prf
 
   def change_policy(self, policy):
     self.policy = policy
@@ -250,12 +256,21 @@ class Routing_table:
     elif come_from == "provider":
       locpref = 50
     elif come_from == "customer":
-      locpref = 200
+      locpref = 150
 
     new_route = {"path": path, "come_from": come_from, "LocPrf": locpref}
 
     if "aspv" in self.policy:
       new_route["aspv"] = self.aspv(new_route, update_message["src"])
+
+    if self.aspv_local_prf:
+      match new_route["aspv"]:
+        case "Valid":
+          new_route["LocPrf"] += 0
+        case "Invalid":
+          new_route["LocPrf"] += -25
+        case "Unknown":
+          new_route["LocPrf"] += -5
 
     try:
       new_route["best_path"] = False
@@ -305,6 +320,15 @@ class Routing_table:
           new_route["best_path"] = True
           self.table[network] = [new_route]
           return (None, {"path": path, "come_from": come_from, "locPrf": new_route["LocPrf"], "network": network})
+      elif self.aspv_local_prf and "aspv" in self.policy:
+          if new_route["aspv"] == "Invalid":
+            new_route["best_path"] = False
+            self.table[network] = [new_route]
+            return None
+          else:
+            new_route["best_path"] = True
+            self.table[network] = [new_route]
+            return (None, {"path": path, "come_from": come_from, "locPrf": new_route["LocPrf"], "network": network})
       else:
         new_route["best_path"] = True
         self.table[network] = [new_route]
@@ -312,6 +336,14 @@ class Routing_table:
 
     except BestPathNotExist:
       if self.policy[0] == "aspv":
+        if new_route["aspv"] == "Invalid":
+          return None
+        else:
+          new_route["best_path"] = True
+          return (None, {"path": path, "come_from": come_from, "locPrf": new_route["LocPrf"], "network": network})
+      elif self.aspv_local_prf and "aspv" in self.policy:
+        # automatically drop announcements for new routes which are invalid
+        # this is in contrast to invalid updates to existing routes
         if new_route["aspv"] == "Invalid":
           return None
         else:
@@ -494,7 +526,10 @@ class Interpreter(Cmd):
       as_class = self.as_class_list.get_AS(param[0])
       if param[1] == "on":
         if re.fullmatch("1|2|3", param[2]):
-          as_class.change_ASPV({"switch": "on", "priority": param[2]})
+          if len(param) > 3:
+            as_class.change_ASPV({"switch": "on", "priority": param[2], "aspv_local_prf": param[3]})
+          else:
+            as_class.change_ASPV({"switch": "on", "priority": param[2]})
         else:
           raise LOTUSInputError
       elif param[1] == "off":
