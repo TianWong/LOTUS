@@ -80,11 +80,11 @@ class AS_class:
     if route_diff == None:
       return
     else:
-      prev_best, route_diff = route_diff
-      route_diff["path"] = str(self.as_number) + "-" + route_diff["path"]
+      prev_best, new_best = route_diff
+      new_best["path"] = str(self.as_number) + "-" + new_best["path"]
       if prev_best:
         prev_best["path"] = str(self.as_number) + "-" + prev_best["path"]
-      return prev_best, route_diff
+      return prev_best, new_best
 
   def change_ASPV(self, message):
     if message["switch"] == "on":
@@ -343,7 +343,7 @@ class Routing_table:
           return (None, {"path": path, "come_from": come_from, "locPrf": new_route["LocPrf"], "network": network})
       elif self.aspv_local_prf and "aspv" in self.policy:
         # automatically drop announcements for new routes which are invalid
-        # this is in contrast to invalid updates to existing routes
+        # skip straight to aspv, disregarding locPrf
         if new_route["aspv"] == "Invalid":
           return None
         else:

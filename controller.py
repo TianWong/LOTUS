@@ -53,6 +53,9 @@ def run_scenario(interp_attributes, config: lc, verbose=False):
             if config.all_asns.class_list[target_as].country == target_country:
                 count += 1
         return count
+    
+    if verbose:
+        print(len(aspa_config), len(updates), updates)
     return len(updates)
 
 def get_interp_attributes(interp:Interpreter):
@@ -89,6 +92,8 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
                 changes = p.starmap(run_scenario, scenario_gen)
                 max_changes = changes[0]
                 results.append(list(map(lambda x: compare_to_worst(x, max_changes), changes)))
+                # if max(results[-1]) != 0.0:
+                #     print(seed, changes)
                 if verbose:
                     for idx, num in enumerate(changes):
                         print(f"{int(proportions[idx] * 100)}% deployment:\t\t{num} changes")

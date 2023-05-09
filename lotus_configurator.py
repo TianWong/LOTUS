@@ -1,7 +1,7 @@
 import json
 import random
 from typing import Tuple
-ASPA_DISTANCE = 5
+ASPA_DISTANCE = 1
 
 class Lotus_configurator:
     setASPV_str = "setASPV {} on {} {}"
