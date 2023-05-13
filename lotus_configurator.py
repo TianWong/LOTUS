@@ -1,3 +1,4 @@
+import copy
 import json
 import random
 from typing import Tuple
@@ -26,6 +27,18 @@ class Lotus_configurator:
         if "aspv_local_prf" in self.params:
             aspv_local_prf = self.params["aspv_local_prf"]
         match self.aspa_flag:
+            case 0:
+                # variable aspv and aspa together, without target protection
+                asn_ls = self.all_asns
+                asn_ls.remove(target)
+                num_deploy = int(float(self.params["rate"]) * len(asn_ls))
+                aspa_config = []
+                for x in random.sample(asn_ls, num_deploy):
+                    aspa_config.extend(
+                        [self.autoASPA_str.format(x, ASPA_DISTANCE), 
+                         self.setASPV_str.format(x, self.params["aspv_level"], aspv_local_prf)])
+                # print(f"aspv deployed: {num_deploy} at {float(self.params["aspv_rate"])}%")
+                return aspa_config
             case 1:
                 # variable aspv and aspa together
                 num_deploy = int(float(self.params["rate"]) * len(self.all_asns))
@@ -49,13 +62,25 @@ class Lotus_configurator:
                 return aspa_config
             case 3:
                 # variable aspv and aspa
+                def rand_elem_gen(seq):
+                    rand_seq = copy.deepcopy(seq)
+                    random.shuffle(rand_seq)
+                    for x in rand_seq:
+                        yield x
                 aspa_deploy = int(float(self.params["aspa_rate"]) * len(self.all_asns)) # account for aspa at target
                 aspv_deploy = int(float(self.params["aspv_rate"]) * len(self.all_asns))
                 config = [self.autoASPA_str.format(target, ASPA_DISTANCE)]
-                config.extend([self.autoASPA_str.format(x, ASPA_DISTANCE) for x in random.sample(self.all_asns, aspa_deploy)])
-                config.extend(
-                    [self.setASPV_str.format(x, self.params["aspv_level"], aspv_local_prf) 
-                     for x in random.sample(self.all_asns, aspv_deploy)])
+                aspa_gen = rand_elem_gen(self.all_asns)
+                aspv_gen = rand_elem_gen(self.all_asns)
+                for i in range(max(aspa_deploy, aspv_deploy)):
+                    if i < aspa_deploy:
+                        config.append(self.autoASPA_str.format(next(aspa_gen), ASPA_DISTANCE))
+                    else:
+                        next(aspa_gen)
+                    if i < aspv_deploy:
+                        config.append(self.setASPV_str.format(next(aspv_gen), self.params["aspv_level"], aspv_local_prf))
+                    else:
+                        next(aspv_gen)
                 return config
             case 4:
                 # variable aspa+aspv and aspv level
@@ -101,10 +126,13 @@ class Lotus_configurator:
                     edge_nodes = json.load(in_file)
                 attacker_asn = random.sample(edge_nodes, 1)[0]
                 asn_cl = list(self.all_asns.class_list.values())
-                while target_asn == None:
-                    val = random.sample(asn_cl, 1)[0]
-                    if val.country == self.params["target"]:
-                        target_asn = val
+                random.shuffle(asn_cl)
+                for asn in asn_cl:
+                    if asn.country == self.params["target"]:
+                        target_asn = asn
+                        break
+                if target_asn == None:
+                    raise RuntimeError(f"No nodes matching target country {self.params['target']}")
                 asns = [attacker_asn, target_asn.as_number]
                 return (asns,
                         [self.attack_str.format(asns[0], asns[1])])

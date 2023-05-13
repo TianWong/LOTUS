@@ -1,4 +1,5 @@
 import copy
+from functools import reduce
 import gc
 import os
 import pickle
@@ -48,15 +49,16 @@ def run_scenario(interp_attributes, config: lc, verbose=False):
     if config.attack_flag == 2:
         count = 0
         target_country = config.params["target"]
-        for prev_best, route_diff in updates:
-            target_as = route_diff["path"].split("-")[0]
+        for routing_table in updates.values():
+            for _, route_diff in routing_table.values():
+                target_as = route_diff["path"].split("-")[0]
             if config.all_asns.class_list[target_as].country == target_country:
                 count += 1
         return count
     
     if verbose:
-        print(len(aspa_config), len(updates), updates)
-    return len(updates)
+        print(f"ASPA+ASPV commands:{len(aspa_config)}, affected ASes:{len(updates)}, {updates}")
+    return reduce(lambda x, y: x + len(y), updates.values(), 0)
 
 def get_interp_attributes(interp:Interpreter):
     as_class_list = copy.deepcopy(interp.as_class_list)
@@ -82,6 +84,22 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
     with open(pickle_file, 'rb') as infile:
         obj = pickle.load(infile)
     match situation:
+        case "random_joint_aspa_aspv_switch":
+            # random attacker and target, protected by aspa/aspv, varying joint aspa+aspv globally
+            p = Pool(11)
+            results = []
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+            for _ in range(iterations):
+                scenario_gen = ((copy.deepcopy(obj), lc(all_asns,aspa=0,attack=1,seed=seed,params={"rate":i,"aspv_level":aspv_level}), verbose) for i in proportions)
+                changes = p.starmap(run_scenario, scenario_gen)
+                max_changes = changes[0]
+                results.append(list(map(lambda x: compare_to_worst(x, max_changes), changes)))
+                if verbose:
+                    for idx, num in enumerate(changes):
+                        print(f"{int(proportions[idx] * 100)}% deployment:\t\t{num} changes")
+                seed += 1
+            df = pd.DataFrame(np.array(results), columns=proportions)
+            return df
         case "random_joint_aspa_aspv":
             # random attacker and target, protected by aspa/aspv, varying joint aspa+aspv globally
             p = Pool(11)
@@ -245,6 +263,32 @@ def main(pickle_file, all_asns, situation, usr_seed=None, aspv_level=1, verbose=
                 results.append(aspv_iter_results / iterations)
                 gc.collect()
             return np.array(results)
+        case "random_aspa_aspv_rewrite":
+            # varying aspa and aspv independent of one another
+            p = Pool(8)
+            proportions = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]
+            results = np.zeros((8,8))
+            iterseed = seed
+            max_changes = None
+            for it in range(iterations):
+                it_update = None
+                for i in proportions:
+                    scenario_gen = ((copy.deepcopy(obj), 
+                                        lc(all_asns,aspa=3,attack=1,seed=iterseed,
+                                            params={"aspa_rate":i,"aspv_rate":j, "aspv_level":aspv_level}), 
+                                        verbose) 
+                                        for j in proportions)
+                    changes = p.starmap(run_scenario, scenario_gen)
+                    if i == proportions[0]:
+                        max_changes = changes[0]
+                    row_update = np.fromiter(map(lambda x: compare_to_worst(x, max_changes), changes), dtype=float)
+                    if i == proportions[0]:
+                        it_update = row_update
+                    else:
+                        it_update = np.vstack((it_update, row_update))
+                iterseed += 1
+                results += it_update
+            return results/iterations
         case _:
             # base scenario, no attack, aspa, aspv
             run_scenario(copy.deepcopy(obj), lc(all_asns))

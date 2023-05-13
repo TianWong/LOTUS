@@ -381,7 +381,7 @@ class Interpreter(Cmd):
     self.message_queue = queue.Queue()
     self.connection_list = []
     self.public_aspa_list = {}
-    self.run_updates = []
+    self.run_updates = {}
 
   intro = """
 ===^^^^^^^^^^^=============================================
@@ -585,7 +585,9 @@ class Interpreter(Cmd):
           continue
         prev_best, route_diff = update_result
         if track_flag:
-          self.run_updates.append((prev_best, route_diff))
+          if connection["dst"] not in self.run_updates:
+            self.run_updates[connection["dst"]] = {}
+          self.run_updates[connection["dst"]][route_diff["network"]] = (prev_best, route_diff)
         if route_diff["come_from"] == "customer":
           for c in connection_with_dst:
             new_update_message = {}
