@@ -109,10 +109,9 @@ class AS_class:
           new_update_message_list.append({"src": update_src, "dst": update_dst, "path": update_src + "-" + r["path"], "network": r["network"]})
     else:
       for r in best_path_list:
-        if r["come_from"] == "customer":
-          if r["path"] == "i": # the network is the AS itself
+        if r["path"] == "i": # the network is the AS itself
             new_update_message_list.append({"src": update_src, "dst": update_dst, "path": update_src, "network": r["network"]})
-          else:
+        elif r["come_from"] == "customer":
             new_update_message_list.append({"src": update_src, "dst": update_dst, "path": update_src + "-" + r["path"], "network": r["network"]})
     return new_update_message_list
 
@@ -214,32 +213,43 @@ class Routing_table:
 
       if path_list[0] != neighbor_as:
         return "Invalid"
+      
+      # trivially valid case
+      if len(path_list) >= 1 and len(path_list) <= 2:
+        return "Valid"
+      
+      path_list.reverse()
 
-      try:
-        index = -1
-        semi_state = "Valid"
-        upflow_fragment = True
-        while True:
-          if upflow_fragment == True:
-            pair_check = self.verify_pair(path_list[index], path_list[index - 1])
-            if pair_check == "Invalid":
-              upflow_fragment = False
-            elif pair_check == "Unknown":
-              semi_state = "Unknown"
-            index -= 1
-          elif upflow_fragment == False:
-            # I-D version: It is thought to be wrong.
-            # pair_check = self.verify_pair(path_list[index - 1], path_list[index])
-            pair_check = self.verify_pair(path_list[index], path_list[index + 1])
-            if pair_check == "Invalid":
-              return "Invalid"
-            elif pair_check == "Unknown":
-              semi_state = "Unknown"
-            index -= 1
-      except IndexError:  # the end of checking
-        pass
+      umin = len(path_list) + 1
+      vmax = 0
+      K = 1
+      L = len(path_list)
+      chain_flag = True
 
-      return semi_state
+      for i in range(len(path_list)):
+        pair_check = self.verify_pair(path_list[i], path_list[i+1])
+        if pair_check != "Valid" and chain_flag:
+          chain_flag = False
+          K = i
+        elif pair_check == "Invalid":
+          umin = i + 1
+          break
+
+      chain_flag = True
+      for i in range(len(path_list), 0, -1):
+        pair_check = self.verify_pair(path_list[i], path_list[i-1])
+        if pair_check != "Valid" and chain_flag:
+          chain_flag = False
+          L = i
+        elif pair_check == "Invalid":
+          vmax = i + 1
+          break
+
+        if umin <= vmax:
+          return "Invalid"
+        elif L - K <= 1:
+          return "Valid"
+        return "Unknown"
 
   def update(self, update_message) -> None | Tuple[None | dict, dict]:
     """

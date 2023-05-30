@@ -4,14 +4,13 @@ import gc
 import os
 import pickle
 import random
+import sys
 
 import pandas as pd
 import numpy as np
 from lotus_configurator import Lotus_configurator as lc
 from main import Interpreter
 from multiprocessing import Pool
-
-BASE_SCENARIO = './ca_gb/ca_gb_cleaned_ranked.lotus'
 
 def run_base(base_scenario):
     if os.path.isfile(base_scenario):
@@ -312,5 +311,7 @@ def export_interpreter(base_scenario, pickle_out, pickle_flag=False):
     return all_asns
 
 if __name__ == "__main__":
-    all_asns = export_interpreter(BASE_SCENARIO, BASE_SCENARIO+".pickle", pickle_flag=True)
-    main(BASE_SCENARIO+".pickle", all_asns, "", verbose=False)
+    base_scenario = sys.argv[1]
+    print(f"using {base_scenario} as the base scenario")
+    all_asns = export_interpreter(base_scenario, base_scenario+".pickle", pickle_flag=True)
+    main(base_scenario+".pickle", all_asns, "", verbose=False)
